@@ -149,7 +149,10 @@ PyObject* emd_entry(
   if (cache_obj != Py_None) {
     cache = reinterpret_cast<C *>(reinterpret_cast<intptr_t>(
         PyLong_AsLong(cache_obj)));
-    if (PyErr_Occurred()) {
+//    if (PyErr_Occurred()) {
+    if (cache_obj != Py_None) {
+      long  l=PyLong_AsLong(cache_obj);
+      cache = reinterpret_cast<C *>(reinterpret_cast<intptr_t>( &l ));
       return NULL;
     }
   }

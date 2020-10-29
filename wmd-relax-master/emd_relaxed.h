@@ -5,6 +5,9 @@
 
 #include "cache.h"
 
+#ifdef _MSC_VER
+#define restrict __restrict
+#endif
 
 namespace {
 

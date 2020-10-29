@@ -16,7 +16,7 @@ CXX_FLAGS = {
               "-Wno-sign-compare", "-flto"],
    "Linux": ["-fopenmp", "-std=c++11", "-march=native", "-ftree-vectorize",
              "-DNDEBUG", "-Wno-sign-compare", "-flto"],
-   "Windows": ["/openmp", "/std:c++latest", "/arch:AVX2", "/DNDEBUG", "/LTCG",
+   "Windows": ["/openmp[:experimental]", "/std:c++latest", "/arch:AVX2", "/DNDEBUG", "/LTCG",
                "/GL"]
 }
 

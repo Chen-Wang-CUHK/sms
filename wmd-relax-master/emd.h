@@ -13,6 +13,10 @@
 #include "cache.h"
 #include "graph/min_cost_flow.h"
 
+#ifdef _MSC_VER
+#define restrict __restrict
+#endif
+
 
 /*! @mainpage libwmdrelax
  *
