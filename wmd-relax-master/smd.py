@@ -1,6 +1,7 @@
 ## Framework for Sentence Mover's Distance
 
 import sys, nltk
+import argparse
 
 import numpy as np
 import spacy
@@ -183,11 +184,13 @@ def print_score(inLines, out_file, results_list):
 	return "Done!"
 
 
-def calc_smd(input_f, output_f=""):
-	inF = open(input_f, 'r')
-	inLines = inF.readlines()
+def calc_smd(opts, output_f=""):
+	inF = open(opts.input_file, 'r')
+	json_inLines = inF.readlines()
 	inF.close()
-	print("Found", len(inLines), "documents")
+	print("Found", len(json_inLines), "documents")
+	# TODO: build the lines with sms format
+	inLines = json_inLines
 	token_doc_list, text_doc_list = tokenize_texts(inLines)
 	count = 0
 	results_list = []
@@ -219,17 +222,30 @@ def calc_smd(input_f, output_f=""):
 
 
 if __name__ == "__main__":
-	in_f = sys.argv[1]
-	[WORD_REP, METRIC] = sys.argv[2:4]
+	# in_f = sys.argv[1]
+	# [WORD_REP, METRIC] = sys.argv[2:4]
+	parser = argparse.ArgumentParser(description="smd.py")
+	parser.add_argument("--input_file", "-input_file", type=str, default='data/cnndm/cnndm_merged_filtered.jsonl',
+						help="The input data file")
+	parser.add_argument("--log_folder", "-log_folder", type=str, default='logs',
+						help="The folder that stored the evaluation logs.")
+	parser.add_argument("--word_rep", "-word_rep", type=str, default='glove',
+						help="The pretrained word representation type.")
+	parser.add_argument("--metric", "-metric", type=str, default='s+wms',
+						help="The type of evaluation metric.")
+	opts = parser.parse_args()
+
+	WORD_REP = opts.word_rep
+	METRIC = opts.metric
 	word_rep_opt = ["glove", "elmo"]
 	metric_opt = ["wms", "sms", "s+wms"]
-	if (WORD_REP not in word_rep_opt) or (METRIC not in metric_opt):
+	if (opts.word_rep not in word_rep_opt) or (opts.metric not in metric_opt):
 		raise Exception("Please choose parameters from the following list:\nWORD_REP:\tglove, elmo\n \
 		METRIC:\twms, sms, s+wms")
-	extension = "_" + WORD_REP + "_" + METRIC + ".out"
-	out_f = ".".join(in_f.split(".")[:-1]) + extension
+	extension = "_" + opts.word_rep + "_" + opts.metric + ".out"
+	out_f = ".".join(opts.input_file.split(".")[:-1]) + extension
 
-	if WORD_REP == "elmo":
+	if opts.word_rep == "elmo":
 		MODEL = ElmoEmbedder()
 
-	calc_smd(in_f, out_f)
+	calc_smd(opts, out_f)
