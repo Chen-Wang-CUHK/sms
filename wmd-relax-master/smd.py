@@ -186,11 +186,9 @@ def print_score(inLines, out_file, results_list):
 
 def calc_smd(opts, output_f=""):
 	inF = open(opts.input_file, 'r')
-	json_inLines = inF.readlines()
+	inLines = inF.readlines()
 	inF.close()
-	print("Found", len(json_inLines), "documents")
-	# TODO: build the lines with sms format
-	inLines = json_inLines
+	print("Found", len(inLines), "documents")
 	token_doc_list, text_doc_list = tokenize_texts(inLines)
 	count = 0
 	results_list = []
@@ -225,7 +223,7 @@ if __name__ == "__main__":
 	# in_f = sys.argv[1]
 	# [WORD_REP, METRIC] = sys.argv[2:4]
 	parser = argparse.ArgumentParser(description="smd.py")
-	parser.add_argument("--input_file", "-input_file", type=str, default='data/cnndm/cnndm_merged_filtered.jsonl',
+	parser.add_argument("--input_file", "-input_file", type=str, default='data/tac_cnndm/sms_input/sms_tac_2010_text_pair.txt',
 						help="The input data file")
 	parser.add_argument("--log_folder", "-log_folder", type=str, default='logs',
 						help="The folder that stored the evaluation logs.")

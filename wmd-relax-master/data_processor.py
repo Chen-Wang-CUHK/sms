@@ -2,7 +2,7 @@ import json
 import os
 
 
-def collect_articles_summs(scores_json=None, summs_json=None, article_json=None, out_file=None, add_ref=False):
+def collect_articles_summs(scores_json=None, summs_json=None, article_json=None, out_file=None):
     if scores_json is None:
         scores_json = os.path.join('data', 'cnndm', 'raw_data', 'preprocess_lqual_scores_out.jsonl')
     if summs_json is None:
@@ -13,6 +13,8 @@ def collect_articles_summs(scores_json=None, summs_json=None, article_json=None,
     # read sys summs scores
     # we read the scores first since its ids was filtered
     summs_scores = {}
+    # we save reference information separately
+    ref_dic = {}
     with open(scores_json, encoding='utf-8') as scores_fr:
         for line in scores_fr:
             """
@@ -33,13 +35,15 @@ def collect_articles_summs(scores_json=None, summs_json=None, article_json=None,
             id = one_score['id']
             sys_name = one_score['system']
             one_human_scores = {}
-            if not add_ref and sys_name == 'reference':
-                continue
             for sc_type in ['overall', 'grammar', 'redundancy']:
                 one_human_scores[sc_type] = one_score['prompts'][sc_type]['gold']
             if id not in summs_scores:
                 summs_scores[id] = {}
-            summs_scores[id][sys_name] = one_human_scores
+                ref_dic[id] = {}
+            if sys_name == 'reference':
+                ref_dic[id]['ref_scores'] = one_human_scores
+            else:
+                summs_scores[id][sys_name] = one_human_scores
 
     # read sys summs
     sys_summs = {}
@@ -58,12 +62,13 @@ def collect_articles_summs(scores_json=None, summs_json=None, article_json=None,
             id = one_summ['id']
             sys_name = one_summ['system']
             summ_text = one_summ['text']
-            if not add_ref and sys_name == 'reference':
-                continue
-            if id in summs_scores and sys_name in summs_scores[id]:
-                if id not in sys_summs:
-                    sys_summs[id] = {}
-                sys_summs[id][sys_name] = summ_text
+            if id in summs_scores:
+                if sys_name == 'reference':
+                    ref_dic[id]['ref_text'] = summ_text
+                elif sys_name in summs_scores[id]:
+                    if id not in sys_summs:
+                        sys_summs[id] = {}
+                    sys_summs[id][sys_name] = summ_text
 
     # read articles
     articles = {}
@@ -92,10 +97,12 @@ def collect_articles_summs(scores_json=None, summs_json=None, article_json=None,
         out_fw = open(out_file, 'w', encoding='utf-8')
     else:
         out_fw = None
+    num_th = 4
     for id in summs_scores:
-        if len(summs_scores[id]) < 4:
+        # filter out the instance that has less than 4 summ_systems
+        if len(summs_scores[id]) < num_th:
             continue
-        filtered_all_data[id] = {'id': id, 'article': articles[id], 'sys_summs': sys_summs[id], 'summs_scores': summs_scores[id]}
+        filtered_all_data[id] = {'id': id, 'article': articles[id], 'sys_summs': sys_summs[id], 'summs_scores': summs_scores[id], 'reference': ref_dic[id]}
         summs_num += len(sys_summs[id])
         saved_str = json.dumps(filtered_all_data[id])
         if out_fw is not None:
