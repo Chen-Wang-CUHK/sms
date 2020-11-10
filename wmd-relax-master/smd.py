@@ -10,11 +10,26 @@ from wmd import WMD
 from nltk.corpus import stopwords
 from collections import Counter
 from allennlp.commands.elmo import ElmoEmbedder
+import json
+import scipy.stats as stats
 
 stop_words = set(stopwords.words('english'))
 
 print("loading spacy")
 nlp = spacy.load('en_core_web_md')
+
+import pprint
+pp = pprint.PrettyPrinter(indent=4)
+
+
+def print_average_correlation(corr_mat, human_metric, ave_type='macro'):
+    corr_mat = np.array(corr_mat)
+    results = dict(zip([human_metric + '_' + ave_type + '_kendall', human_metric + '_' + ave_type + '_pearson', human_metric + '_' + ave_type + '_spearman'],
+                       [np.mean(corr_mat[:,0]),
+                       np.mean(corr_mat[:,1]),
+                       np.mean(corr_mat[:,2])]))
+    pp.pprint(results)
+
 
 def tokenize_texts(inLines):
 
@@ -211,12 +226,90 @@ def calc_smd(opts, output_f=""):
 		if doc_id == int((len(token_doc_list) / 10.) * count):
 			print(str(count * 10) + "% done with calculations")
 			count += 1
-	if output_f != "":
-		print_score(inLines, output_f, results_list)
-	else:
-		print("Results: ", np.mean(results_list))
+	# added by wchen to compute correlation scores with human annotated scores
+	hscoreF = open(opts.score_file, 'r')
+	hscoreLines = hscoreF.readlines()
+	hscoreF.close()
+	compute_corrs(opts, results_list, hscoreLines)
+	# if output_f != "":
+	# 	print_score(inLines, output_f, results_list)
+	# else:
+	# 	print("Results: ", np.mean(results_list))
+	# return 'Done!'
 
-	return 'Done!'
+
+def compute_corrs(opts, pred_scores_list, hscoresLines):
+	assert len(pred_scores_list) == len(hscoresLines)
+	year = opts.input_file.split('tac_')[-1].split('_')[0]
+	total_scores = {}
+	topic_based_scores = {}
+	for idx, line in enumerate(hscoresLines):
+		line = line.strip()
+		hscores_dict = json.loads(line)
+		# add pred_score as the pseudo human score for build the data to compute correlations
+		hscores_dict['human_scores']['pred_score'] = pred_scores_list[idx]
+		# get the total scores
+		for metric in hscores_dict['human_scores']:
+			if metric not in total_scores:
+				total_scores[metric] = [hscores_dict['human_scores'][metric]]
+			else:
+				total_scores[metric].append(hscores_dict['human_scores'][metric])
+		# get topic based scores
+		# {"id": "topic006588_doc_name_006588_summ_ml", "human_scores": {"overall": -1.0, "grammar": -0.5, "redundancy": -0.5}}
+		topic_summ_id = hscores_dict['id']
+		topic = topic_summ_id.split('_')[0][len('topic'):]
+		# doc_name = topic_summ_id.split('doc_name_')[-1].split('_')[0]
+		sys_name = topic_summ_id.split('summ_')[-1]
+		if topic not in topic_based_scores:
+			topic_based_scores[topic] = {}
+			for metric in hscores_dict['human_scores']:
+				topic_based_scores[topic][metric] = {}
+				topic_based_scores[topic][metric][sys_name] = [hscores_dict['human_scores'][metric]]
+		elif sys_name not in topic_based_scores[topic]['pred_score']:
+			for metric in hscores_dict['human_scores']:
+				topic_based_scores[topic][metric][sys_name] = [hscores_dict['human_scores'][metric]]
+		else:
+			for metric in hscores_dict['human_scores']:
+				topic_based_scores[topic][metric][sys_name].append(hscores_dict['human_scores'][metric])
+
+	# average the scores from multi-documents for topic-based scores
+	for topic in topic_based_scores:
+		# to keep the same order
+		sys_names_list = list(topic_based_scores[topic]['pred_score'].keys())
+		for metric in topic_based_scores[topic]:
+			metric_based_scores = []
+			for sys_name in sys_names_list:
+				topic_based_scores[topic][metric][sys_name] = np.mean(topic_based_scores[topic][metric][sys_name])
+				metric_based_scores.append(np.mean(topic_based_scores[topic][metric][sys_name]))
+			topic_based_scores[topic][metric] = metric_based_scores
+
+	if year != 'cnndm':
+		# {"pyr_score": 0.286, "responsiveness": 2.0}
+		target_metrics = ['pyr_score', 'responsiveness']
+	else:
+		target_metrics = ['overall', 'grammar', 'redundancy']
+	# macro averaged corr score
+	for trgt_metric in target_metrics:
+		topic_based_corr = []
+		for topic in topic_based_scores:
+			# skip the case that has equal human scores for each system
+			target_scores = topic_based_scores[topic][trgt_metric]
+			prediction_scores = topic_based_scores[topic]['pred_score']
+			if not (np.array(target_scores) == target_scores[0]).all():
+				topic_based_corr.append([
+					stats.kendalltau(target_scores, prediction_scores)[0],
+					stats.pearsonr(target_scores, prediction_scores)[0],
+					stats.spearmanr(target_scores, prediction_scores)[0]])
+			print('\n=====ALL Macro RESULTS=====')
+			print_average_correlation(topic_based_corr, human_metric=trgt_metric, ave_type='macro')
+			# micro averaged correlation scores
+			total_hss = total_scores[trgt_metric]
+			total_pss = total_scores['pred_score']
+			micro_corr = [stats.kendalltau(total_hss, total_pss)[0],
+						  stats.pearsonr(total_hss, total_pss)[0],
+						  stats.spearmanr(total_hss, total_pss)[0]]
+			print('\n=====ALL Micro RESULTS=====')
+			print_average_correlation([micro_corr], human_metric=trgt_metric, ave_type='micro')
 
 
 if __name__ == "__main__":
