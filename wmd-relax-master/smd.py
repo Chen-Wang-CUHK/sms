@@ -316,7 +316,10 @@ if __name__ == "__main__":
 	# in_f = sys.argv[1]
 	# [WORD_REP, METRIC] = sys.argv[2:4]
 	parser = argparse.ArgumentParser(description="smd.py")
-	parser.add_argument("--input_file", "-input_file", type=str, default='data/tac_cnndm/sms_input/sms_tac_2010_text_pair.txt',
+	parser.add_argument("--input_file", "-input_file", type=str, default='data/tac_cnndm/sms_input/sms_tac_cnndm_text_pair.txt',
+						help="The input data file")
+	parser.add_argument("--score_file", "-score_file", type=str,
+						default='data/tac_cnndm/sms_input/sms_tac_cnndm_scores.jsonl',
 						help="The input data file")
 	parser.add_argument("--log_folder", "-log_folder", type=str, default='logs',
 						help="The folder that stored the evaluation logs.")
