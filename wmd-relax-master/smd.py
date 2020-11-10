@@ -241,19 +241,12 @@ def calc_smd(opts, output_f=""):
 def compute_corrs(opts, pred_scores_list, hscoresLines):
 	assert len(pred_scores_list) == len(hscoresLines)
 	year = opts.input_file.split('tac_')[-1].split('_')[0]
-	total_scores = {}
 	topic_based_scores = {}
 	for idx, line in enumerate(hscoresLines):
 		line = line.strip()
 		hscores_dict = json.loads(line)
 		# add pred_score as the pseudo human score for build the data to compute correlations
 		hscores_dict['human_scores']['pred_score'] = pred_scores_list[idx]
-		# get the total scores
-		for metric in hscores_dict['human_scores']:
-			if metric not in total_scores:
-				total_scores[metric] = [hscores_dict['human_scores'][metric]]
-			else:
-				total_scores[metric].append(hscores_dict['human_scores'][metric])
 		# get topic based scores
 		# {"id": "topic006588_doc_name_006588_summ_ml", "human_scores": {"overall": -1.0, "grammar": -0.5, "redundancy": -0.5}}
 		topic_summ_id = hscores_dict['id']
@@ -291,35 +284,37 @@ def compute_corrs(opts, pred_scores_list, hscoresLines):
 	# macro averaged corr score
 	for trgt_metric in target_metrics:
 		topic_based_corr = []
+		total_hss = []
+		total_pss = []
 		for topic in topic_based_scores:
 			# skip the case that has equal human scores for each system
 			target_scores = topic_based_scores[topic][trgt_metric]
 			prediction_scores = topic_based_scores[topic]['pred_score']
+			total_hss.extend(target_scores)
+			total_pss.extend(prediction_scores)
 			if not (np.array(target_scores) == target_scores[0]).all():
 				topic_based_corr.append([
 					stats.kendalltau(target_scores, prediction_scores)[0],
 					stats.pearsonr(target_scores, prediction_scores)[0],
 					stats.spearmanr(target_scores, prediction_scores)[0]])
-			print('\n=====ALL Macro RESULTS=====')
-			print_average_correlation(topic_based_corr, human_metric=trgt_metric, ave_type='macro')
-			# micro averaged correlation scores
-			total_hss = total_scores[trgt_metric]
-			total_pss = total_scores['pred_score']
-			micro_corr = [stats.kendalltau(total_hss, total_pss)[0],
-						  stats.pearsonr(total_hss, total_pss)[0],
-						  stats.spearmanr(total_hss, total_pss)[0]]
-			print('\n=====ALL Micro RESULTS=====')
-			print_average_correlation([micro_corr], human_metric=trgt_metric, ave_type='micro')
+		print('\n====={} Macro RESULTS====='.format(trgt_metric))
+		print_average_correlation(topic_based_corr, human_metric=trgt_metric, ave_type='macro')
+		# micro averaged correlation scores
+		micro_corr = [stats.kendalltau(total_hss, total_pss)[0],
+					  stats.pearsonr(total_hss, total_pss)[0],
+					  stats.spearmanr(total_hss, total_pss)[0]]
+		print('\n====={} Micro RESULTS====='.format(trgt_metric))
+		print_average_correlation([micro_corr], human_metric=trgt_metric, ave_type='micro')
 
 
 if __name__ == "__main__":
 	# in_f = sys.argv[1]
 	# [WORD_REP, METRIC] = sys.argv[2:4]
 	parser = argparse.ArgumentParser(description="smd.py")
-	parser.add_argument("--input_file", "-input_file", type=str, default='data/tac_cnndm/sms_input/sms_tac_cnndm_text_pair.txt',
+	parser.add_argument("--input_file", "-input_file", type=str, default='data/tac_cnndm/sms_input/sms_tac_2010_text_pair.small.txt',
 						help="The input data file")
 	parser.add_argument("--score_file", "-score_file", type=str,
-						default='data/tac_cnndm/sms_input/sms_tac_cnndm_scores.jsonl',
+						default='data/tac_cnndm/sms_input/sms_tac_2010_scores.small.jsonl',
 						help="The input data file")
 	parser.add_argument("--log_folder", "-log_folder", type=str, default='logs',
 						help="The folder that stored the evaluation logs.")
