@@ -1,4 +1,5 @@
 /wmd-relax-master/data/*
+/wmd-relax-master/logs/*
 *.xml
 *.pyc
 
